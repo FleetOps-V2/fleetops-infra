@@ -1,4 +1,7 @@
 services:
+
+  # ─── Infrastructure ──────────────────────────────────────────────────────────
+
   postgres:
     image: postgres:15-alpine
     container_name: fleetops-postgres
@@ -9,7 +12,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
-      - ./database/seed.sql:/docker-entrypoint-initdb.d/seed.sql
     ports:
       - "5432:5432"
     networks:
@@ -36,6 +38,8 @@ services:
       retries: 5
       start_period: 10s
 
+  # ─── Microservices ───────────────────────────────────────────────────────────
+
   auth-service:
     build:
       context: ../fleetops-auth-service
@@ -47,7 +51,11 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRATION=${JWT_EXPIRATION:-86400000}
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-*}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:8080}
+      # FIX #3: activate 'dev' profile so DataInitializer seeds default users
+      - SPRING_PROFILES_ACTIVE=dev
+      # FIX #14: JVM memory limits to prevent OOM on developer machines
+      - JAVA_OPTS=-Xms128m -Xmx384m
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,7 +66,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 45s
+      start_period: 60s
 
   vehicle-service:
     build:
@@ -72,7 +80,8 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-*}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:8080}
+      - JAVA_OPTS=-Xms128m -Xmx384m
     depends_on:
       postgres:
         condition: service_healthy
@@ -85,7 +94,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 45s
+      start_period: 60s
 
   maintenance-service:
     build:
@@ -97,7 +106,8 @@ services:
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-postgres}
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - JWT_SECRET=${JWT_SECRET}
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-*}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:8080}
+      - JAVA_OPTS=-Xms128m -Xmx256m
     depends_on:
       postgres:
         condition: service_healthy
@@ -121,8 +131,10 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - JWT_SECRET=${JWT_SECRET}
       - VEHICLE_SERVICE_URL=${VEHICLE_SERVICE_URL:-http://vehicle-service:8080}
+      # FIX #2: wired properly — maintenance integration now uses this URL
       - MAINTENANCE_SERVICE_URL=${MAINTENANCE_SERVICE_URL:-http://maintenance-service:8080}
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-*}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:8080}
+      - JAVA_OPTS=-Xms128m -Xmx384m
     depends_on:
       postgres:
         condition: service_healthy
@@ -139,13 +151,44 @@ services:
       retries: 5
       start_period: 60s
 
+  # ─── API Gateway (nginx) ──────────────────────────────────────────────────────
+  # FIX #8: nginx reverse-proxy routes /api/* to correct backend service.
+  # Frontend talks only to this gateway on port 8080.
+
+  gateway:
+    image: nginx:alpine
+    container_name: fleetops-gateway
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      vehicle-service:
+        condition: service_healthy
+      maintenance-service:
+        condition: service_healthy
+      request-service:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    networks:
+      - fleetops-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health/auth || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Frontend (builds and writes dist to shared volume) ──────────────────────
+
   frontend:
     build:
       context: ../fleetops-frontend
       dockerfile: Dockerfile
-    container_name: fleetops-frontend
-    ports:
-      - "8080:80"
+    container_name: fleetops-frontend-builder
+
     depends_on:
       auth-service:
         condition: service_healthy
@@ -164,4 +207,3 @@ volumes:
 networks:
   fleetops-network:
     driver: bridge
-

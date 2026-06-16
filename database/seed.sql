@@ -2,49 +2,34 @@
 -- Run against vehicle_db
 -- Mixed statuses and near-expiry dates for realistic demo
 
-CREATE TABLE IF NOT EXISTS vehicles (
-    id                  SERIAL PRIMARY KEY,
-    vehicle_number      VARCHAR(20)  NOT NULL UNIQUE,
-    model               VARCHAR(100) NOT NULL,
-    brand               VARCHAR(100) NOT NULL,
-    type                VARCHAR(50)  NOT NULL,
-    status              VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
-    current_mileage     INTEGER      NOT NULL DEFAULT 0,
-    last_service_date   DATE,
-    next_service_date   DATE,
-    next_service_mileage INTEGER,
-    insurance_expiry    DATE,
-    assigned_driver_id  VARCHAR(100),
-    created_at          TIMESTAMP    NOT NULL DEFAULT NOW(),
-    updated_at          TIMESTAMP    NOT NULL DEFAULT NOW()
-);
+-- Schema creation is handled by Flyway migrations.
 
-INSERT INTO vehicles (vehicle_number, model, brand, type, status, current_mileage, last_service_date, next_service_date, next_service_mileage, insurance_expiry, assigned_driver_id) VALUES
+INSERT INTO vehicles (vehicle_number, model, brand, type, status, current_mileage, last_service_date, next_service_date, next_service_mileage, insurance_expiry, assigned_driver_id, version) VALUES
 -- Active vehicles — healthy
-('KL07AB1234', 'Innova Crysta',      'Toyota',         'SUV',         'ACTIVE',     45200, '2025-01-10', '2025-07-10', 55000,  '2026-12-31', 'driver1'),
-('KL08CD5678', 'Ace Gold',           'Tata',           'Mini Truck',  'ACTIVE',     31000, '2025-02-15', '2025-08-15', 41000,  '2026-11-15', 'driver2'),
-('KL09EF4321', 'Bolero Plus',        'Mahindra',       'SUV',         'ACTIVE',     62000, '2024-12-01', '2025-06-01', 72000,  '2026-09-30', 'driver3'),
-('KL10GH9876', '407 Truck',          'Ashok Leyland',  'Heavy Truck', 'ACTIVE',     98000, '2025-03-20', '2025-09-20', 108000, '2026-10-20', 'driver4'),
+('KL07AB1234', 'Innova Crysta',      'Toyota',         'SUV',         'ACTIVE',     45200, '2025-01-10', '2025-07-10', 55000,  '2026-12-31', 'driver1',  0),
+('KL08CD5678', 'Ace Gold',           'Tata',           'Mini Truck',  'ACTIVE',     31000, '2025-02-15', '2025-08-15', 41000,  '2026-11-15', 'driver2',  0),
+('KL09EF4321', 'Bolero Plus',        'Mahindra',       'SUV',         'ACTIVE',     62000, '2024-12-01', '2025-06-01', 72000,  '2026-09-30', 'driver3',  0),
+('KL10GH9876', '407 Truck',          'Ashok Leyland',  'Heavy Truck', 'ACTIVE',     98000, '2025-03-20', '2025-09-20', 108000, '2026-10-20', 'driver4',  0),
 
 -- Vehicles due for service soon (date-based alert)
-('KL11IJ2345', 'Eeco',               'Maruti Suzuki',  'Van',         'ACTIVE',     29500, '2024-10-05', '2025-04-05', 39500,  '2026-08-15', 'driver5'),
-('KL12KL6789', 'Transit Van',        'Ford',           'Van',         'ACTIVE',     74000, '2024-11-20', '2025-05-20', 84000,  '2026-07-01', 'driver6'),
+('KL11IJ2345', 'Eeco',               'Maruti Suzuki',  'Van',         'ACTIVE',     29500, '2024-10-05', '2025-04-05', 39500,  '2026-08-15', 'driver5',  0),
+('KL12KL6789', 'Transit Van',        'Ford',           'Van',         'ACTIVE',     74000, '2024-11-20', '2025-05-20', 84000,  '2026-07-01', 'driver6',  0),
 
 -- Insurance expiring within 30 days (demo alert cards)
-('KL13MN3456', 'City',               'Honda',          'Sedan',       'ACTIVE',     22000, '2025-01-01', '2025-07-01', 32000,  (CURRENT_DATE + INTERVAL '12 days')::DATE, 'driver7'),
-('KL14OP7890', 'Dzire',              'Maruti Suzuki',  'Sedan',       'ACTIVE',     18500, '2025-02-10', '2025-08-10', 28500,  (CURRENT_DATE + INTERVAL '7 days')::DATE,  'driver8'),
-('KL15QR1234', 'Swift',              'Maruti Suzuki',  'Hatchback',   'ACTIVE',     15000, '2025-03-15', '2025-09-15', 25000,  (CURRENT_DATE + INTERVAL '22 days')::DATE, 'driver9'),
+('KL13MN3456', 'City',               'Honda',          'Sedan',       'ACTIVE',     22000, '2025-01-01', '2025-07-01', 32000,  (CURRENT_DATE + INTERVAL '12 days')::DATE, 'driver7',  0),
+('KL14OP7890', 'Dzire',              'Maruti Suzuki',  'Sedan',       'ACTIVE',     18500, '2025-02-10', '2025-08-10', 28500,  (CURRENT_DATE + INTERVAL '7 days')::DATE,  'driver8',  0),
+('KL15QR1234', 'Swift',              'Maruti Suzuki',  'Hatchback',   'ACTIVE',     15000, '2025-03-15', '2025-09-15', 25000,  (CURRENT_DATE + INTERVAL '22 days')::DATE, 'driver9',  0),
 
 -- In service (currently under maintenance)
-('KL16ST5678', 'Duster',             'Renault',        'SUV',         'IN_SERVICE', 53000, '2025-01-25', '2025-07-25', 63000,  '2026-06-30', 'driver10'),
-('KL17UV9012', 'Super Carry',        'Maruti Suzuki',  'Mini Truck',  'IN_SERVICE', 44000, '2024-12-10', '2025-06-10', 54000,  '2026-05-15', 'driver11'),
+('KL16ST5678', 'Duster',             'Renault',        'SUV',         'IN_SERVICE', 53000, '2025-01-25', '2025-07-25', 63000,  '2026-06-30', 'driver10', 0),
+('KL17UV9012', 'Super Carry',        'Maruti Suzuki',  'Mini Truck',  'IN_SERVICE', 44000, '2024-12-10', '2025-06-10', 54000,  '2026-05-15', 'driver11', 0),
 
 -- Breakdown (emergency)
-('KL18WX3456', 'BharatBenz 1015R',   'BharatBenz',     'Heavy Truck', 'BREAKDOWN',  87000, '2024-09-01', '2025-03-01', 97000,  '2026-04-30', 'driver12'),
+('KL18WX3456', 'BharatBenz 1015R',   'BharatBenz',     'Heavy Truck', 'BREAKDOWN',  87000, '2024-09-01', '2025-03-01', 97000,  '2026-04-30', 'driver12', 0),
 
 -- High mileage — service overdue (mileage-based alert)
-('KL19YZ7890', 'Hiace',              'Toyota',         'Van',         'ACTIVE',     112000,'2024-08-15', '2025-02-15', 100000, '2026-03-31', 'driver13'),
+('KL19YZ7890', 'Hiace',              'Toyota',         'Van',         'ACTIVE',     112000,'2024-08-15', '2025-02-15', 100000, '2026-03-31', 'driver13', 0),
 
 -- Retired vehicles
-('KL20AB1111', 'Tempo Traveller',    'Force',          'Van',         'RETIRED',    210000,'2023-06-01', NULL,         NULL,   '2024-12-31', NULL),
-('KL21CD2222', 'Leyland Viking',     'Ashok Leyland',  'Bus',         'RETIRED',    315000,'2022-12-01', NULL,         NULL,   '2024-06-30', NULL);
+('KL20AB1111', 'Tempo Traveller',    'Force',          'Van',         'RETIRED',    210000,'2023-06-01', NULL,         NULL,   '2024-12-31', NULL,       0),
+('KL21CD2222', 'Leyland Viking',     'Ashok Leyland',  'Bus',         'RETIRED',    315000,'2022-12-01', NULL,         NULL,   '2024-06-30', NULL,       0);

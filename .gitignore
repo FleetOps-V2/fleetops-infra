@@ -1,0 +1,20 @@
+# ─── Secrets — NEVER commit these ──────────────────────────────────────────
+# The .env file contains database passwords and JWT secrets.
+# Copy .env.example and fill in your values locally.
+# In AWS: secrets are pulled from Secrets Manager at runtime.
+.env
+
+# ─── OS / Editor ────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/
+
+# ─── Docker runtime artifacts ────────────────────────────────────────────────
+*.log
+
+# Sensitive Terraform variables
+terraform.tfvars
+*.tfvars
+!*.tfvars.example

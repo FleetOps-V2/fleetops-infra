@@ -12,6 +12,6 @@ EOSQL
 
 echo "FleetOps databases created successfully."
 
-echo "Seeding vehicle_db..."
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "vehicle_db" -f /docker-entrypoint-initdb.d/seed.sql
-echo "Vehicle seeding completed."
+
+echo "All FleetOps databases initialized cleanly. No seeding performed at DB level; handled by microservices."
+
