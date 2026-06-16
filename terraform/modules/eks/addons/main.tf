@@ -277,7 +277,7 @@ resource "helm_release" "argocd" {
             namespace = "argocd"
             project   = "default"
             source = {
-              repoURL        = "https://github.com/FleetOps-Project-Devops/fleetops-deployments.git"
+              repoURL        = "https://github.com/FleetOps-V2/fleetops-deployments.git"
               targetRevision = "HEAD"
               path           = "argocd/apps/prod"
             }
