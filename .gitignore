@@ -18,3 +18,9 @@ Thumbs.db
 terraform.tfvars
 *.tfvars
 !*.tfvars.example
+
+# Terraform Local State/Cache
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
