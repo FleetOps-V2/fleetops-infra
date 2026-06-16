@@ -175,6 +175,7 @@ module "eks_cluster" {
   public_subnet_ids    = module.networking.public_subnet_ids
   private_subnet_ids   = module.networking.private_subnet_ids
   control_plane_sg_id  = module.networking.eks_control_plane_sg_id
+  admin_iam_user_arns  = ["arn:aws:iam::538661800892:user/Johann-Aby-Vannilam", "arn:aws:iam::538661800892:user/fleetops-terraform-deployer"]
 }
 
 module "eks_oidc" {

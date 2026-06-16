@@ -25,4 +25,7 @@ variable "control_plane_sg_id" {
 
 
 
-
+variable "admin_iam_user_arns" {
+  type    = list(string)
+  default = []
+}

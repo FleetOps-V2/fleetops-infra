@@ -19,7 +19,7 @@ locals {
 resource "aws_eks_cluster" "main" {
   name     = local.cluster_name
   version  = var.eks_cluster_version
-  role_arn = var.eks_cluster_role_arn
+  role_arn = var.eks_cluster_role_arn != "" ? var.eks_cluster_role_arn : aws_iam_role.eks_cluster.arn
 
   vpc_config {
     subnet_ids              = concat(var.public_subnet_ids, var.private_subnet_ids)
@@ -29,13 +29,21 @@ resource "aws_eks_cluster" "main" {
     public_access_cidrs     = ["0.0.0.0/0"]
   }
 
+  access_config {
+    authentication_mode                         = "API_AND_CONFIG_MAP"
+    bootstrap_cluster_creator_admin_permissions = true
+  }
+
   enabled_cluster_log_types = [
     "api", "audit", "authenticator", "controllerManager", "scheduler"
   ]
 
   tags = merge(local.common_tags, { Name = local.cluster_name })
 
-  depends_on = [var.eks_cluster_role_arn]
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_cluster_policy,
+    aws_iam_role_policy_attachment.eks_vpc_resource_controller
+  ]
 }
 
 # ── EKS Cluster IAM Role ──────────────────────────────────────
@@ -63,7 +71,23 @@ resource "aws_iam_role_policy_attachment" "eks_vpc_resource_controller" {
   role       = aws_iam_role.eks_cluster.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController"
 }
+resource "aws_eks_access_entry" "admin_users" {
+  for_each          = toset(var.admin_iam_user_arns)
+  cluster_name      = aws_eks_cluster.main.name
+  principal_arn     = each.value
+  kubernetes_groups = ["system:masters"]
+  type              = "STANDARD"
+}
 
+resource "aws_eks_access_policy_association" "admin_users_policy" {
+  for_each      = toset(var.admin_iam_user_arns)
+  cluster_name  = aws_eks_cluster.main.name
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+  principal_arn = each.value
 
+  access_scope {
+    type       = "cluster"
+  }
+}
 
 
