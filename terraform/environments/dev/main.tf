@@ -100,15 +100,15 @@ module "ecr" {
 }
 
 module "rds" {
-  source                    = "../../modules/rds"
-  project                   = "fleetops"
-  environment               = var.environment
-  private_subnet_ids        = module.networking.private_subnet_ids
-  rds_sg_id                 = module.networking.rds_sg_id
-  kms_rds_key_arn           = module.kms.rds_key_arn
-  db_instance_class         = var.db_instance_class
-  db_username               = var.db_username
-  db_password               = var.db_password
+  source                     = "../../modules/rds"
+  project                    = "fleetops"
+  environment                = var.environment
+  private_subnet_ids         = module.networking.private_subnet_ids
+  rds_sg_id                  = module.networking.rds_sg_id
+  kms_rds_key_arn            = module.kms.rds_key_arn
+  db_instance_class          = var.db_instance_class
+  db_username                = var.db_username
+  db_password                = var.db_password
   enable_deletion_protection = var.enable_deletion_protection
 }
 
@@ -175,7 +175,8 @@ module "eks_cluster" {
   public_subnet_ids    = module.networking.public_subnet_ids
   private_subnet_ids   = module.networking.private_subnet_ids
   control_plane_sg_id  = module.networking.eks_control_plane_sg_id
-  admin_iam_user_arns  = ["arn:aws:iam::538661800892:user/Johann-Aby-Vannilam", "arn:aws:iam::538661800892:user/fleetops-terraform-deployer"]
+  admin_iam_user_arns  = var.admin_iam_user_arns
+  public_access_cidrs  = var.eks_public_access_cidrs
 }
 
 module "eks_oidc" {
@@ -206,9 +207,10 @@ module "eks_addons" {
   cluster_name       = module.eks_cluster.cluster_name
   vpc_id             = module.networking.vpc_id
   oidc_provider_url  = module.eks_oidc.oidc_provider_url
+  argocd_repo_url    = var.argocd_repo_url
 }
 
-# "?"? Phases 4-7 Module Calls "?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?"?
+# ── Phases 4-7 Module Calls ──────────────────────────────────
 
 module "sns" {
   source          = "../../modules/sns"
@@ -301,7 +303,6 @@ module "cloudfront" {
   waf_web_acl_arn     = module.waf.web_acl_arn
   hosted_zone_id      = module.route53.zone_id
 }
-
 
 
 

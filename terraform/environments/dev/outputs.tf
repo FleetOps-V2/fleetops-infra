@@ -17,6 +17,14 @@ output "kms_rds_key_arn"          { value = module.kms.rds_key_arn }
 output "kms_secrets_key_arn"      { value = module.kms.secrets_key_arn }
 output "kms_s3_key_arn"           { value = module.kms.s3_key_arn }
 
+# Ingress bootstrap outputs — consumed by GitHub Actions to generate charts/ingress/values-infra.yaml
+output "acm_certificate_arn"      { value = module.acm.certificate_arn }
+output "alb_sg_id"                { value = module.networking.alb_sg_id }
+output "hosted_zone_id"           { value = module.route53.zone_id }
+output "eks_cluster_name"         { value = module.eks_cluster.cluster_name }
+output "eks_cluster_endpoint"     { value = module.eks_cluster.cluster_endpoint }
+output "github_actions_role_arn"  { value = module.iam.github_actions_role_arn }
+
 
 
 

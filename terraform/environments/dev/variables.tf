@@ -59,8 +59,8 @@ variable "jwt_secret" {
 
 # EKS — Phase 2B (defaults allow plan to succeed before EKS exists)
 variable "eks_cluster_version" {
-  type = string
-  default = "1.30"
+  type    = string
+  default = "1.31"
 }
 variable "eks_node_instance_type" {
   type = string
@@ -79,17 +79,40 @@ variable "eks_node_desired_size" {
   default = 2
 }
 variable "oidc_provider_url" {
-  type = string
+  type    = string
   default = ""
 }
 variable "k8s_namespace" {
-  type = string
+  type    = string
   default = "fleetops-prod"
 }
 variable "k8s_service_account_name" {
-  type = string
+  type    = string
   default = "fleetops-app"
 }
+
+# Admin users granted cluster-admin via EKS Access Entries.
+# Avoids hardcoding ARNs in module calls.
+variable "admin_iam_user_arns" {
+  type        = list(string)
+  default     = []
+  description = "IAM user ARNs to grant EKS cluster-admin access."
+}
+
+# Restrict the EKS public API endpoint to known CIDRs (VPN, bastion, CI runner).
+# Default allows all IPs — tighten before going to production.
+variable "eks_public_access_cidrs" {
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+  description = "CIDR ranges allowed to reach the EKS API server. Restrict in production."
+}
+
+variable "argocd_repo_url" {
+  type        = string
+  default     = "https://github.com/FleetOps-V2/fleetops-deployments.git"
+  description = "Git repository URL for the ArgoCD root application."
+}
+
 
 
 

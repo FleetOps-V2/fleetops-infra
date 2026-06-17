@@ -16,8 +16,13 @@ variable "vpc_id" {
   type = string
 }
 variable "oidc_provider_url" {
-  type = string
+  type        = string
   description = "OIDC provider URL without https:// (from eks/oidc output)"
+}
+
+variable "argocd_repo_url" {
+  type        = string
+  description = "Git repository URL for the ArgoCD root application."
 }
 
 

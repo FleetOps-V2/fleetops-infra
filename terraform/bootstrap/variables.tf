@@ -1,6 +1,6 @@
 variable "aws_region" {
   type = string
-  default     = "ap-south-1"
+  default     = "us-east-1"
   description = "AWS region for provisioning bootstrap resources"
 }
 

@@ -32,8 +32,8 @@ resource "aws_eks_node_group" "main" {
     max_unavailable = 1
   }
 
-  # Use latest EKS-optimised AMI automatically
-  ami_type = "AL2_x86_64"
+  # Amazon Linux 2023 — AL2 reached EoL June 2025
+  ami_type = "AL2023_x86_64_STANDARD"
 
   labels = {
     role        = "application"

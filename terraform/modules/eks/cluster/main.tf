@@ -26,7 +26,7 @@ resource "aws_eks_cluster" "main" {
     security_group_ids      = [var.control_plane_sg_id]
     endpoint_public_access  = true   # kubectl access from outside
     endpoint_private_access = true   # node-to-API internal access
-    public_access_cidrs     = ["0.0.0.0/0"]
+    public_access_cidrs     = var.public_access_cidrs
   }
 
   access_config {

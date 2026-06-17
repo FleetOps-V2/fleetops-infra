@@ -51,18 +51,74 @@ resource "aws_iam_policy" "alb_controller" {
   name        = "${local.name_prefix}-alb-controller-policy"
   description = "IAM policy for AWS Load Balancer Controller"
 
-  # Full policy from AWS docs (abbreviated here — use the official JSON in production)
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = ["elasticloadbalancing:*", "ec2:Describe*", "ec2:AuthorizeSecurityGroupIngress",
-                    "ec2:RevokeSecurityGroupIngress", "ec2:CreateSecurityGroup", "ec2:DeleteSecurityGroup",
-                    "ec2:CreateTags", "ec2:DeleteTags", "ec2:ModifyNetworkInterfaceAttribute",
-                    "cognito-idp:DescribeUserPoolClient", "acm:ListCertificates",
-                    "acm:DescribeCertificate", "iam:CreateServiceLinkedRole",
-                    "shield:GetSubscriptionState", "wafv2:*", "waf-regional:*", "tag:*"]
+        Effect = "Allow"
+        Action = [
+          "elasticloadbalancing:CreateLoadBalancer",
+          "elasticloadbalancing:DeleteLoadBalancer",
+          "elasticloadbalancing:RegisterTargets",
+          "elasticloadbalancing:DeregisterTargets",
+          "elasticloadbalancing:ModifyLoadBalancerAttributes",
+          "elasticloadbalancing:CreateTargetGroup",
+          "elasticloadbalancing:DeleteTargetGroup",
+          "elasticloadbalancing:ModifyTargetGroup",
+          "elasticloadbalancing:ModifyTargetGroupAttributes",
+          "elasticloadbalancing:CreateListener",
+          "elasticloadbalancing:DeleteListener",
+          "elasticloadbalancing:CreateRule",
+          "elasticloadbalancing:DeleteRule",
+          "elasticloadbalancing:ModifyRule",
+          "elasticloadbalancing:SetIpAddressType",
+          "elasticloadbalancing:SetSubnets",
+          "elasticloadbalancing:SetSecurityGroups",
+          "elasticloadbalancing:AddListenerCertificates",
+          "elasticloadbalancing:RemoveListenerCertificates",
+          "elasticloadbalancing:DescribeLoadBalancers",
+          "elasticloadbalancing:DescribeTargetGroups",
+          "elasticloadbalancing:DescribeTargetHealth",
+          "elasticloadbalancing:DescribeListeners",
+          "elasticloadbalancing:DescribeRules",
+          "elasticloadbalancing:DescribeListenerCertificates",
+          "elasticloadbalancing:DescribeLoadBalancerAttributes",
+          "elasticloadbalancing:DescribeTags",
+          "elasticloadbalancing:AddTags",
+          "elasticloadbalancing:RemoveTags",
+          "elasticloadbalancing:SetWebAcl",
+          "ec2:DescribeInstances",
+          "ec2:DescribeNetworkInterfaces",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeVpcs",
+          "ec2:DescribeAvailabilityZones",
+          "ec2:DescribeInternetGateways",
+          "ec2:DescribeAddresses",
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:RevokeSecurityGroupIngress",
+          "ec2:CreateSecurityGroup",
+          "ec2:DeleteSecurityGroup",
+          "ec2:CreateTags",
+          "ec2:DeleteTags",
+          "ec2:ModifyNetworkInterfaceAttribute",
+          "acm:ListCertificates",
+          "acm:DescribeCertificate",
+          "iam:CreateServiceLinkedRole",
+          "cognito-idp:DescribeUserPoolClient",
+          "shield:GetSubscriptionState",
+          "wafv2:GetWebACL",
+          "wafv2:GetWebACLForResource",
+          "wafv2:AssociateWebACL",
+          "wafv2:DisassociateWebACL",
+          "wafv2:ListWebACLs",
+          "waf-regional:GetWebACLForResource",
+          "waf-regional:GetWebACL",
+          "waf-regional:AssociateWebACL",
+          "waf-regional:DisassociateWebACL",
+          "tag:GetResources",
+          "tag:TagResources"
+        ]
         Resource = "*"
       }
     ]
@@ -277,7 +333,7 @@ resource "helm_release" "argocd" {
             namespace = "argocd"
             project   = "default"
             source = {
-              repoURL        = "https://github.com/FleetOps-V2/fleetops-deployments.git"
+              repoURL        = var.argocd_repo_url
               targetRevision = "HEAD"
               path           = "argocd/apps/prod"
             }
@@ -343,6 +399,7 @@ resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
 resource "aws_eks_addon" "fluent_bit" {
   cluster_name             = var.cluster_name
   addon_name               = "aws-for-fluent-bit"
+  addon_version            = "v1.31.0-eksbuild.1"
   service_account_role_arn = aws_iam_role.fluent_bit.arn
   tags                     = local.common_tags
 }
@@ -368,9 +425,24 @@ resource "aws_iam_role" "fluent_bit" {
   tags = local.common_tags
 }
 
-resource "aws_iam_role_policy_attachment" "fluent_bit_logs" {
-  role       = aws_iam_role.fluent_bit.name
-  policy_arn = "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
+resource "aws_iam_role_policy" "fluent_bit_logs" {
+  name = "${local.name_prefix}-fluent-bit-policy"
+  role = aws_iam_role.fluent_bit.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogStreams",
+        "logs:DescribeLogGroups"
+      ]
+      Resource = "arn:aws:logs:*:*:*"
+    }]
+  })
 }
 
 

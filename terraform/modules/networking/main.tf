@@ -372,6 +372,64 @@ resource "aws_vpc_endpoint" "secretsmanager" {
   tags = merge(local.common_tags, { Name = "${local.name_prefix}-secretsmanager-endpoint" })
 }
 
+# KMS Interface Endpoint — for envelope encryption used by all services
+resource "aws_vpc_endpoint" "kms" {
+  vpc_id              = aws_vpc.main.id
+  service_name        = "com.amazonaws.${var.aws_region}.kms"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  private_dns_enabled = true
+
+  tags = merge(local.common_tags, { Name = "${local.name_prefix}-kms-endpoint" })
+}
+
+# SQS Interface Endpoint — for GPS telemetry queue (Phase 5+)
+resource "aws_vpc_endpoint" "sqs" {
+  vpc_id              = aws_vpc.main.id
+  service_name        = "com.amazonaws.${var.aws_region}.sqs"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  private_dns_enabled = true
+
+  tags = merge(local.common_tags, { Name = "${local.name_prefix}-sqs-endpoint" })
+}
+
+# SNS Interface Endpoint — for fleet alert notifications
+resource "aws_vpc_endpoint" "sns" {
+  vpc_id              = aws_vpc.main.id
+  service_name        = "com.amazonaws.${var.aws_region}.sns"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  private_dns_enabled = true
+
+  tags = merge(local.common_tags, { Name = "${local.name_prefix}-sns-endpoint" })
+}
+
+# DynamoDB Gateway Endpoint — free, for telemetry storage (Phase 5+)
+resource "aws_vpc_endpoint" "dynamodb" {
+  vpc_id            = aws_vpc.main.id
+  service_name      = "com.amazonaws.${var.aws_region}.dynamodb"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [aws_route_table.private.id]
+
+  tags = merge(local.common_tags, { Name = "${local.name_prefix}-dynamodb-endpoint" })
+}
+
+# Bedrock Runtime Interface Endpoint — for AI Maintenance Advisor (Phase 7)
+resource "aws_vpc_endpoint" "bedrock_runtime" {
+  vpc_id              = aws_vpc.main.id
+  service_name        = "com.amazonaws.${var.aws_region}.bedrock-runtime"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  private_dns_enabled = true
+
+  tags = merge(local.common_tags, { Name = "${local.name_prefix}-bedrock-runtime-endpoint" })
+}
+
 
 
 
