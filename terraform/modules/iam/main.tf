@@ -59,6 +59,22 @@ resource "aws_iam_instance_profile" "eks_node" {
   tags = local.common_tags
 }
 
+# ECR pull-through cache: nodes must be able to create cached repos and
+# import upstream images on first pull. ReadOnly policy does not cover these.
+resource "aws_iam_role_policy" "eks_node_ecr_pull_through" {
+  name = "${local.name_prefix}-eks-node-ecr-pull-through"
+  role = aws_iam_role.eks_node.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ecr:CreateRepository", "ecr:BatchImportUpstreamImage"]
+      Resource = "arn:aws:ecr:*:*:repository/*"
+    }]
+  })
+}
+
 # ── App IRSA Role ─────────────────────────────────────────────
 # Assumed by Kubernetes ServiceAccounts via OIDC federation
 # Grants: Secrets Manager read, SSM read, KMS decrypt, S3 access
@@ -183,6 +199,39 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
 resource "aws_iam_role_policy_attachment" "lambda_vpc" {
   role       = aws_iam_role.lambda.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+# ── AWS DevOps Agent Role ─────────────────────────────────────
+# Assumed by the AWS DevOps Agent service to read FleetOps infrastructure.
+# Role ARN is entered in the Agent Space console configuration.
+resource "aws_iam_role" "devops_agent" {
+  name = "${local.name_prefix}-devops-agent-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "aidevops.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "devops_agent_cloudwatch" {
+  role       = aws_iam_role.devops_agent.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "devops_agent_eks" {
+  role       = aws_iam_role.devops_agent.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "devops_agent_rds" {
+  role       = aws_iam_role.devops_agent.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonRDSReadOnlyAccess"
 }
 
 resource "aws_iam_role_policy" "lambda_app" {

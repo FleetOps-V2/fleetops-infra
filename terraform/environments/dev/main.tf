@@ -57,6 +57,8 @@ provider "kubernetes" {
 
 # ── Phase 2A Module Calls ─────────────────────────────────────
 
+data "aws_caller_identity" "current" {}
+
 module "kms" {
   source      = "../../modules/kms"
   project     = "fleetops"
@@ -81,8 +83,7 @@ module "iam" {
   aws_region   = var.aws_region
   kms_key_arns = module.kms.all_key_arns
 
-  # Populated in Phase 2B after EKS OIDC provider is created
-  oidc_provider_url        = var.oidc_provider_url
+  oidc_provider_url        = module.eks_oidc.oidc_provider_url
   k8s_namespace            = var.k8s_namespace
   k8s_service_account_name = var.k8s_service_account_name
 
@@ -91,12 +92,6 @@ module "iam" {
   sqs_gps_queue_arn      = module.sqs.gps_tracking_queue_arn
   sns_alerts_topic_arn   = module.sns.service_alerts_topic_arn
   bedrock_policy_arn     = module.bedrock.bedrock_access_policy_arn
-}
-
-module "ecr" {
-  source      = "../../modules/ecr"
-  project     = "fleetops"
-  environment = var.environment
 }
 
 module "rds" {
@@ -208,6 +203,9 @@ module "eks_addons" {
   vpc_id             = module.networking.vpc_id
   oidc_provider_url  = module.eks_oidc.oidc_provider_url
   argocd_repo_url    = var.argocd_repo_url
+
+  # Helm charts need schedulable nodes — wait for node group to be ready.
+  depends_on = [module.eks_nodegroup]
 }
 
 # ── Phases 4-7 Module Calls ──────────────────────────────────

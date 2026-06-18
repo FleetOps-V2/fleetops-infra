@@ -125,6 +125,80 @@ resource "aws_dynamodb_table" "lock_table" {
   }
 }
 
+# ── ECR Repositories ─────────────────────────────────────────────
+# Kept in bootstrap so images survive terraform destroy/apply cycles
+# on the main environment. Repos are cheap; recreating them loses all
+# pushed images and breaks GitOps tag references in Helm values.
+
+locals {
+  ecr_services = [
+    "auth-service",
+    "vehicle-service",
+    "request-service",
+    "maintenance-service",
+    "frontend",
+  ]
+  ecr_operators = ["external-secrets"]
+
+  ecr_tags = {
+    Project     = "fleetops"
+    Environment = "bootstrap"
+    ManagedBy   = "terraform"
+    Module      = "ecr"
+  }
+}
+
+resource "aws_ecr_repository" "services" {
+  for_each             = toset(local.ecr_services)
+  name                 = "fleetops-dev/${each.key}"
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true
+
+  image_scanning_configuration { scan_on_push = true }
+  encryption_configuration    { encryption_type = "AES256" }
+
+  tags = merge(local.ecr_tags, { Name = "fleetops-dev-${each.key}" })
+}
+
+resource "aws_ecr_repository" "operators" {
+  for_each             = toset(local.ecr_operators)
+  name                 = each.key
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true
+
+  image_scanning_configuration { scan_on_push = true }
+  encryption_configuration    { encryption_type = "AES256" }
+
+  tags = merge(local.ecr_tags, { Name = each.key, Purpose = "operator-mirror" })
+}
+
+resource "aws_ecr_lifecycle_policy" "services" {
+  for_each   = aws_ecr_repository.services
+  repository = each.value.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Remove untagged images after 1 day"
+        selection    = { tagStatus = "untagged", countType = "sinceImagePushed", countUnit = "days", countNumber = 1 }
+        action       = { type = "expire" }
+      },
+      {
+        rulePriority = 2
+        description  = "Keep last 10 tagged images (v* for prod, develop-* for dev)"
+        selection = {
+          tagStatus     = "tagged"
+          tagPrefixList = ["v", "develop"]
+          countType     = "imageCountMoreThan"
+          countNumber   = 10
+        }
+        action = { type = "expire" }
+      }
+    ]
+  })
+}
+
 
 
 

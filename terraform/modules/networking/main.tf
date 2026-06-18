@@ -430,6 +430,34 @@ resource "aws_vpc_endpoint" "bedrock_runtime" {
   tags = merge(local.common_tags, { Name = "${local.name_prefix}-bedrock-runtime-endpoint" })
 }
 
+# EKS Interface Endpoint — required for AL2023 nodeadm bootstrap.
+# Without this, nodes in private subnets cannot call eks.amazonaws.com
+# to get the cluster CA and endpoint, so they never join the cluster.
+resource "aws_vpc_endpoint" "eks" {
+  vpc_id              = aws_vpc.main.id
+  service_name        = "com.amazonaws.${var.aws_region}.eks"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  private_dns_enabled = true
+
+  tags = merge(local.common_tags, { Name = "${local.name_prefix}-eks-endpoint" })
+}
+
+# EC2 Interface Endpoint — required for AL2023 nodeadm bootstrap.
+# nodeadm calls EC2/DescribeInstances to fetch instance details before
+# configuring kubelet. Without this, bootstrap retries until timeout.
+resource "aws_vpc_endpoint" "ec2" {
+  vpc_id              = aws_vpc.main.id
+  service_name        = "com.amazonaws.${var.aws_region}.ec2"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.vpc_endpoints.id]
+  private_dns_enabled = true
+
+  tags = merge(local.common_tags, { Name = "${local.name_prefix}-ec2-endpoint" })
+}
+
 
 
 

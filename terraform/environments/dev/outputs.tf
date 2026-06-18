@@ -1,7 +1,13 @@
 output "vpc_id"                   { value = module.networking.vpc_id }
 output "private_subnet_ids"       { value = module.networking.private_subnet_ids }
 output "public_subnet_ids"        { value = module.networking.public_subnet_ids }
-output "ecr_repository_urls"      { value = module.ecr.repository_urls }
+output "ecr_repository_urls" {
+  description = "ECR repository URLs — repos live in bootstrap, computed here for convenience"
+  value = {
+    for svc in ["auth-service", "vehicle-service", "request-service", "maintenance-service", "frontend"] :
+    svc => "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/fleetops-dev/${svc}"
+  }
+}
 output "rds_endpoint"             { value = module.rds.db_endpoint }
 output "redis_endpoint"           { value = module.redis.redis_endpoint }
 output "s3_vehicle_docs_bucket"   { value = module.s3.vehicle_docs_bucket_name }
@@ -28,3 +34,5 @@ output "github_actions_role_arn"  { value = module.iam.github_actions_role_arn }
 
 
 
+output "github_actions_ecr_role_arn" { value = module.iam.github_actions_ecr_role_arn }
+output "devops_agent_role_arn"      { value = module.iam.devops_agent_role_arn }

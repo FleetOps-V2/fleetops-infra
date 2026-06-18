@@ -253,6 +253,10 @@ resource "helm_release" "aws_load_balancer_controller" {
     name = "vpcId"
     value = var.vpc_id
   }
+  set {
+    name  = "image.repository"
+    value = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/ecr-public/eks/aws-load-balancer-controller"
+  }
 }
 
 # ── Helm: External Secrets Operator ──────────────────────────
@@ -269,6 +273,20 @@ resource "helm_release" "external_secrets" {
     name = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
     value = aws_iam_role.external_secrets.arn
   }
+  set {
+    name  = "image.repository"
+    value = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/external-secrets"
+  }
+  set {
+    name  = "webhook.image.repository"
+    value = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/external-secrets"
+  }
+  set {
+    name  = "certController.image.repository"
+    value = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/external-secrets"
+  }
+
+  depends_on = [helm_release.aws_load_balancer_controller]
 }
 
 # ── Helm: Metrics Server ──────────────────────────────────────
@@ -278,6 +296,11 @@ resource "helm_release" "metrics_server" {
   chart      = "metrics-server"
   namespace  = "kube-system"
   version    = "3.12.1"
+
+  set {
+    name  = "image.repository"
+    value = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/registry.k8s.io/metrics-server/metrics-server"
+  }
 }
 
 # ── Helm: Cluster Autoscaler ──────────────────────────────────
@@ -312,6 +335,10 @@ resource "helm_release" "cluster_autoscaler" {
     name = "extraArgs.skip-nodes-with-system-pods"
     value = "false"
   }
+  set {
+    name  = "image.repository"
+    value = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/registry.k8s.io/autoscaling/cluster-autoscaler"
+  }
 }
 
 # -- Helm: ArgoCD (GitOps) ---------------------------------------------------
@@ -322,10 +349,35 @@ resource "helm_release" "argocd" {
   namespace        = "argocd"
   create_namespace = true
   version          = "6.7.11"
+  timeout          = 600
+  force_update     = true
+  wait             = false
+  atomic           = false
+
+  # ALB controller installs a ValidatingWebhookConfiguration that intercepts
+  # Ingress objects. If ArgoCD installs before ALB controller pods are Ready,
+  # the webhook call fails with "no endpoints available". Wait for it first.
+  depends_on = [helm_release.aws_load_balancer_controller]
 
   # Automatically bootstrap the Root Application!
   values = [
     yamlencode({
+      global = {
+        image = {
+          # Route all ArgoCD component images through ECR pull-through cache
+          # (quay.io pull-through cache, no credentials required for public images)
+          repository = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/quay.io/argoproj/argocd"
+        }
+      }
+      dex = {
+        # Dex is for OIDC/SSO only — not needed. Disable to avoid ghcr.io pull.
+        enabled = false
+      }
+      redis = {
+        image = {
+          repository = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/ecr-public/docker/library/redis"
+        }
+      }
       server = {
         additionalApplications = [
           {
@@ -362,9 +414,13 @@ resource "helm_release" "argocd" {
 resource "aws_eks_addon" "cloudwatch_observability" {
   cluster_name             = var.cluster_name
   addon_name               = "amazon-cloudwatch-observability"
-  addon_version            = "v1.7.0-eksbuild.1"
+  addon_version            = "v6.2.0-eksbuild.1"
   service_account_role_arn = aws_iam_role.cloudwatch_agent.arn
   tags                     = local.common_tags
+
+  # CloudWatch addon creates Service resources that trigger the ALB webhook.
+  # Wait for ALB controller pods to be Running before starting the addon.
+  depends_on = [helm_release.aws_load_balancer_controller]
 }
 
 resource "aws_iam_role" "cloudwatch_agent" {
@@ -393,16 +449,10 @@ resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
 }
 
-# -- EKS Managed Add-on: Fluent Bit (Container Log Shipping) ----------------
-# Forwards all container stdout/stderr logs from every pod to CloudWatch Logs.
-# Without this addon, no application logs are visible in CloudWatch.
-resource "aws_eks_addon" "fluent_bit" {
-  cluster_name             = var.cluster_name
-  addon_name               = "aws-for-fluent-bit"
-  addon_version            = "v1.31.0-eksbuild.1"
-  service_account_role_arn = aws_iam_role.fluent_bit.arn
-  tags                     = local.common_tags
-}
+# aws-for-fluent-bit EKS managed addon is not supported on Kubernetes 1.31.
+# Log shipping is handled by the amazon-cloudwatch-observability addon above,
+# which bundles the CloudWatch agent and Fluent Bit in a single package.
+# The IAM role below is retained for when Fluent Bit is deployed via Helm.
 
 resource "aws_iam_role" "fluent_bit" {
   name = "${local.name_prefix}-fluent-bit-role"

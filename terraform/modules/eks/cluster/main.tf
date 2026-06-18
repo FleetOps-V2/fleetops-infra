@@ -72,11 +72,10 @@ resource "aws_iam_role_policy_attachment" "eks_vpc_resource_controller" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController"
 }
 resource "aws_eks_access_entry" "admin_users" {
-  for_each          = toset(var.admin_iam_user_arns)
-  cluster_name      = aws_eks_cluster.main.name
-  principal_arn     = each.value
-  kubernetes_groups = ["system:masters"]
-  type              = "STANDARD"
+  for_each     = toset(var.admin_iam_user_arns)
+  cluster_name = aws_eks_cluster.main.name
+  principal_arn = each.value
+  type         = "STANDARD"
 }
 
 resource "aws_eks_access_policy_association" "admin_users_policy" {
@@ -86,8 +85,10 @@ resource "aws_eks_access_policy_association" "admin_users_policy" {
   principal_arn = each.value
 
   access_scope {
-    type       = "cluster"
+    type = "cluster"
   }
+
+  depends_on = [aws_eks_access_entry.admin_users]
 }
 
 

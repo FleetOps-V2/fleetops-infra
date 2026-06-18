@@ -23,6 +23,16 @@ output "kms_key_arn" {
   description = "The ARN of the KMS key used for state encryption"
 }
 
+output "ecr_repository_urls" {
+  description = "Map of service name → ECR repository URL"
+  value       = { for name, repo in aws_ecr_repository.services : name => repo.repository_url }
+}
+
+output "ecr_operator_urls" {
+  description = "Map of operator name → ECR repository URL"
+  value       = { for name, repo in aws_ecr_repository.operators : name => repo.repository_url }
+}
+
 
 
 
