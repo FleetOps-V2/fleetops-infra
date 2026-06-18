@@ -28,6 +28,16 @@ variable "jwt_secret" {
   description = "JWT signing secret (32+ chars)"
   sensitive = true
 }
+variable "github_username" {
+  type      = string
+  description = "GitHub username for ArgoCD repo access"
+  default   = "johannabyvannilamad"
+}
+variable "github_pat" {
+  type      = string
+  description = "GitHub PAT for ArgoCD to pull fleetops-deployments"
+  sensitive = true
+}
 
 
 

@@ -79,11 +79,14 @@ resource "aws_iam_policy" "alb_controller" {
           "elasticloadbalancing:DescribeLoadBalancers",
           "elasticloadbalancing:DescribeTargetGroups",
           "elasticloadbalancing:DescribeTargetHealth",
+          "elasticloadbalancing:DescribeTargetGroupAttributes",
           "elasticloadbalancing:DescribeListeners",
           "elasticloadbalancing:DescribeRules",
           "elasticloadbalancing:DescribeListenerCertificates",
           "elasticloadbalancing:DescribeLoadBalancerAttributes",
           "elasticloadbalancing:DescribeTags",
+          "elasticloadbalancing:ModifyLoadBalancerAttributes",
+          "elasticloadbalancing:DescribeListenerAttributes",
           "elasticloadbalancing:AddTags",
           "elasticloadbalancing:RemoveTags",
           "elasticloadbalancing:SetWebAcl",
@@ -227,6 +230,11 @@ resource "aws_iam_role_policy" "external_secrets" {
           "ssm:GetParametersByPath"
         ]
         Resource = "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/${var.project}/*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
+        Resource = var.kms_secrets_key_arn != "" ? var.kms_secrets_key_arn : "*"
       }
     ]
   })
@@ -458,6 +466,31 @@ resource "aws_iam_role" "cloudwatch_agent" {
 resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
   role       = aws_iam_role.cloudwatch_agent.name
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+# -- ArgoCD repo credentials (GitHub PAT from Secrets Manager) ---------------
+# Recreated automatically on every terraform apply — no manual kubectl needed.
+# Token is stored in Secrets Manager, never in Git or tfvars.
+data "aws_secretsmanager_secret_version" "github_pat" {
+  secret_id = "${var.project}/${var.environment}/github-pat"
+}
+
+resource "kubernetes_secret" "argocd_repo" {
+  metadata {
+    name      = "argocd-repo-fleetops-deployments"
+    namespace = "argocd"
+    labels = {
+      "argocd.argoproj.io/secret-type" = "repository"
+    }
+  }
+  data = {
+    type     = "git"
+    url      = "https://github.com/FleetOps-V2/fleetops-deployments.git"
+    username = jsondecode(data.aws_secretsmanager_secret_version.github_pat.secret_string)["username"]
+    password = jsondecode(data.aws_secretsmanager_secret_version.github_pat.secret_string)["token"]
+  }
+
+  depends_on = [helm_release.argocd]
 }
 
 # aws-for-fluent-bit EKS managed addon is not supported on Kubernetes 1.31.

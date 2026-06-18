@@ -142,6 +142,7 @@ module "secrets_manager" {
   db_username         = var.db_username
   db_password         = var.db_password
   jwt_secret          = var.jwt_secret
+  github_pat          = var.github_pat
 }
 
 module "ssm" {
@@ -194,15 +195,71 @@ module "eks_nodegroup" {
   desired_size        = var.eks_node_desired_size
 }
 
+# EKS managed nodes get the auto-created cluster SG, not the node group SG.
+# These rules let pods reach RDS and Redis through the cluster SG.
+resource "aws_vpc_security_group_ingress_rule" "rds_from_eks_cluster_sg" {
+  security_group_id            = module.networking.rds_sg_id
+  referenced_security_group_id = module.eks_cluster.cluster_sg_id
+  from_port                    = 5432
+  to_port                      = 5432
+  ip_protocol                  = "tcp"
+  description                  = "PostgreSQL from EKS cluster SG (managed node pods)"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "redis_from_eks_cluster_sg" {
+  security_group_id            = module.networking.redis_sg_id
+  referenced_security_group_id = module.eks_cluster.cluster_sg_id
+  from_port                    = 6379
+  to_port                      = 6379
+  ip_protocol                  = "tcp"
+  description                  = "Redis from EKS cluster SG (managed node pods)"
+}
+
+# ALB health checks and traffic reach pods on port 8080 (backend) and 80 (frontend).
+# The EKS auto-created cluster SG is on all managed nodes; ALB uses target-type=ip.
+resource "aws_vpc_security_group_ingress_rule" "alb_to_pods_8080" {
+  security_group_id            = module.eks_cluster.cluster_sg_id
+  referenced_security_group_id = module.networking.alb_sg_id
+  from_port                    = 8080
+  to_port                      = 8080
+  ip_protocol                  = "tcp"
+  description                  = "ALB to backend pods on 8080 (Spring Boot)"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "alb_to_pods_80" {
+  security_group_id            = module.eks_cluster.cluster_sg_id
+  referenced_security_group_id = module.networking.alb_sg_id
+  from_port                    = 80
+  to_port                      = 80
+  ip_protocol                  = "tcp"
+  description                  = "ALB to frontend pods on 80 (nginx)"
+}
+
+# CloudFront uses origin.fleetops.website as its origin (https-only).
+# The wildcard cert *.fleetops.website covers this subdomain.
+# ALB DNS is created by the K8s ALB controller — update this if the ingress is recreated.
+resource "aws_route53_record" "origin_alb_alias" {
+  zone_id = module.route53.zone_id
+  name    = "origin.${var.domain_name}"
+  type    = "A"
+
+  alias {
+    name                   = "k8s-fleetops-fleetops-ddb124929b-181049021.us-east-1.elb.amazonaws.com"
+    zone_id                = "Z35SXDOTRQ7X7K"
+    evaluate_target_health = true
+  }
+}
+
 module "eks_addons" {
-  source             = "../../modules/eks/addons"
-  project            = "fleetops"
-  environment        = var.environment
-  aws_region         = var.aws_region
-  cluster_name       = module.eks_cluster.cluster_name
-  vpc_id             = module.networking.vpc_id
-  oidc_provider_url  = module.eks_oidc.oidc_provider_url
-  argocd_repo_url    = var.argocd_repo_url
+  source               = "../../modules/eks/addons"
+  project              = "fleetops"
+  environment          = var.environment
+  aws_region           = var.aws_region
+  cluster_name         = module.eks_cluster.cluster_name
+  vpc_id               = module.networking.vpc_id
+  oidc_provider_url    = module.eks_oidc.oidc_provider_url
+  argocd_repo_url      = var.argocd_repo_url
+  kms_secrets_key_arn  = module.kms.secrets_key_arn
 
   # Helm charts need schedulable nodes — wait for node group to be ready.
   depends_on = [module.eks_nodegroup]

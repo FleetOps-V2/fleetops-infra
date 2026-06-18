@@ -64,7 +64,7 @@ variable "eks_cluster_version" {
 }
 variable "eks_node_instance_type" {
   type = string
-  default = "t3.small"
+  default = "m7i-flex.large"
 }
 variable "eks_node_min_size" {
   type = number
@@ -105,6 +105,12 @@ variable "eks_public_access_cidrs" {
   type        = list(string)
   default     = ["0.0.0.0/0"]
   description = "CIDR ranges allowed to reach the EKS API server. Restrict in production."
+}
+
+variable "github_pat" {
+  type      = string
+  sensitive = true
+  description = "GitHub PAT for ArgoCD to pull fleetops-deployments (stored in Secrets Manager)"
 }
 
 variable "argocd_repo_url" {

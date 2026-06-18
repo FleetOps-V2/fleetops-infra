@@ -9,6 +9,11 @@ output "oidc_issuer_url" {
   value       = aws_eks_cluster.main.identity[0].oidc[0].issuer
 }
 
+output "cluster_sg_id" {
+  description = "Auto-created EKS cluster security group — attached to all managed nodes and pods"
+  value       = aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
+}
+
 
 
 

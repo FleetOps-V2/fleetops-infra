@@ -51,6 +51,25 @@ resource "aws_secretsmanager_secret_version" "jwt" {
   secret_string = jsonencode({ jwt_secret = var.jwt_secret })
 }
 
+# ── GitHub PAT for ArgoCD ─────────────────────────────────────
+# ArgoCD uses this to pull from the private fleetops-deployments repo.
+# recovery_window_in_days = 0 for dev so destroy + apply works immediately.
+resource "aws_secretsmanager_secret" "github_pat" {
+  name                    = "${var.project}/${var.environment}/github-pat"
+  description             = "GitHub PAT for ArgoCD to pull fleetops-deployments"
+  recovery_window_in_days = var.environment == "prod" ? 30 : 0
+
+  tags = merge(local.common_tags, { Name = "${local.name_prefix}-github-pat" })
+}
+
+resource "aws_secretsmanager_secret_version" "github_pat" {
+  secret_id     = aws_secretsmanager_secret.github_pat.id
+  secret_string = jsonencode({
+    username = var.github_username
+    token    = var.github_pat
+  })
+}
+
 
 
 

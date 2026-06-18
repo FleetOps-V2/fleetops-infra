@@ -25,6 +25,12 @@ variable "argocd_repo_url" {
   description = "Git repository URL for the ArgoCD root application."
 }
 
+variable "kms_secrets_key_arn" {
+  type        = string
+  description = "ARN of the KMS key used to encrypt Secrets Manager secrets (for ESO decrypt)"
+  default     = ""
+}
+
 
 
 
