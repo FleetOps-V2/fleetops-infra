@@ -49,10 +49,18 @@ jobs:
 
       - name: Terraform Plan
         working-directory: terraform/environments/dev
+        env:
+          TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+          TF_VAR_jwt_secret:  ${{ secrets.TF_VAR_JWT_SECRET }}
+          TF_VAR_db_username: ${{ secrets.TF_VAR_DB_USERNAME }}
         run: terraform plan -out=tfplan
 
       - name: Terraform Apply
         working-directory: terraform/environments/dev
+        env:
+          TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+          TF_VAR_jwt_secret:  ${{ secrets.TF_VAR_JWT_SECRET }}
+          TF_VAR_db_username: ${{ secrets.TF_VAR_DB_USERNAME }}
         run: terraform apply -auto-approve tfplan
 
       # ── Bootstrap: write infra values so ArgoCD can deploy Ingress ──────────
@@ -102,3 +110,35 @@ jobs:
           # only commit if file actually changed (idempotent on unchanged infra)
           git diff --cached --quiet || git commit -m "chore: update ingress infra values from terraform [skip ci]"
           git push
+
+      # ── Mirror operator images that ghcr.io pull-through cache can't fetch ──
+      # ghcr.io pull-through cache requires credentials in Secrets Manager.
+      # Until that's configured, we mirror manually on every apply (idempotent).
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Mirror external-secrets image to ECR
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ECR="${ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com"
+          GHCR_IMAGE="ghcr.io/external-secrets/external-secrets:v0.9.19"
+          ECR_IMAGE="${ECR}/external-secrets:v0.9.19"
+
+          # Check if image already exists to avoid unnecessary re-push
+          if aws ecr describe-images --repository-name external-secrets \
+              --image-ids imageTag=v0.9.19 --region us-east-1 >/dev/null 2>&1; then
+            echo "Image already in ECR, skipping mirror"
+          else
+            docker pull "$GHCR_IMAGE"
+            docker tag  "$GHCR_IMAGE" "$ECR_IMAGE"
+            docker push "$ECR_IMAGE"
+            echo "Mirrored $GHCR_IMAGE → $ECR_IMAGE"
+          fi
+
+      - name: Print key outputs for GitHub secrets setup
+        working-directory: terraform/environments/dev
+        run: |
+          echo "=== GitHub Secrets to configure ==="
+          echo "AWS_ROLE_ARN (infra repo):       $(terraform output -raw github_actions_role_arn)"
+          echo "AWS_ECR_ROLE_ARN (service repos): $(terraform output -raw github_actions_ecr_role_arn)"
+          echo "devops_agent_role_arn:            $(terraform output -raw devops_agent_role_arn)"
